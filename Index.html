@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Telegram Web Browser</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-hint-color: #999999;
+            --tg-theme-link-color: #2481cc;
+            --tg-theme-button-color: #40a7e3;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-secondary-bg-color: #f4f4f5;
+            --tg-theme-header-bg-color: #ffffff;
+            --tg-theme-accent-text-color: #40a7e3;
+            --tg-theme-section-bg-color: #ffffff;
+            --tg-theme-section-header-text-color: #40a7e3;
+            --tg-theme-subtitle-text-color: #999999;
+            --tg-theme-destructive-text-color: #ff3b30;
+            
+            --ios-blur: saturate(180%) blur(20px);
+            --card-radius: 16px;
+            --pill-radius: 100px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            
+            --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.05);
+            --shadow-medium: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+
+        body {
+            font-family: var(--font-system);
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: var(--transition);
+        }
+
+        .app-container {
+            max-width: 100%;
+            min-height: 100vh;
+            padding-bottom: 90px;
+            position: relative;
+        }
+
+        /* Header with iOS pill tabs */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            padding: 12px 16px;
+            background: rgba(var(--tg-theme-header-bg-color-rgb, 255, 255, 255), 0.8);
+            backdrop-filter: var(--ios-blur);
+            -webkit-backdrop-filter: var(--ios-blur);
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .pill-tabs {
+            display: flex;
+            background: var(--tg-theme-secondary-bg-color);
+            border-radius: var(--pill-radius);
+            padding: 4px;
+            max-width: 280px;
+            margin: 0 auto;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px 20px;
+            border-radius: var(--pill-radius);
+            font-weight: 500;
+            font-size: 15px;
+            transition: var(--transition);
+            cursor: pointer;
+            color: var(--tg-theme-subtitle-text-color);
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            box-shadow: 0 2px 8px rgba(64, 167, 227, 0.3);
+        }
+
+        /* Main content */
+        .main-content {
+            padding: 20px 16px;
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .main-content.hidden {
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+        }
+
+        .welcome-card {
+            background: var(--tg-theme-section-bg-color);
+            border-radius: var(--card-radius);
+            padding: 32px 24px;
+            text-align: center;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-soft);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .welcome-icon {
+            font-size: 48px;
+            color: var(--tg-theme-button-color);
+            margin-bottom: 16px;
+            opacity: 0.9;
+        }
+
+        .welcome-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--tg-theme-text-color);
+        }
+
+        .welcome-subtitle {
+            font-size: 16px;
+            color: var(--tg-theme-subtitle-text-color);
+            line-height: 1.4;
+        }
+
+        /* Browser view */
+        .browser-view {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--tg-theme-bg-color);
+            z-index: 2000;
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .browser-view.active {
+            transform: translateY(0);
+        }
+
+        .browser-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(var(--tg-theme-header-bg-color-rgb, 255, 255, 255), 0.9);
+            backdrop-filter: var(--ios-blur);
+            -webkit-backdrop-filter: var(--ios-blur);
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+            gap: 12px;
+        }
+
+        .back-button {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: var(--tg-theme-text-color);
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .back-button:hover, .back-button:active {
+            background: var(--tg-theme-secondary-bg-color);
+        }
+
+        .browser-url {
+            flex: 1;
+            font-size: 14px;
+            color: var(--tg-theme-subtitle-text-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding: 8px 12px;
+            background: var(--tg-theme-secondary-bg-color);
+            border-radius: 10px;
+        }
+
+        .browser-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .browser-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        /* Bottom search bar (One UI style) */
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--tg-theme-section-bg-color);
+            padding: 16px;
+            box-shadow: 0 -2px 30px rgba(0, 0, 0, 0.08);
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            z-index: 1000;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .search-container {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .search-button {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 15px rgba(64, 167, 227, 0.3);
+        }
+
+        .search-button:hover, .search-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 10px rgba(64, 167, 227, 0.4);
+        }
+
+        .search-input-container {
+            flex: 1;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px 20px;
+            border: none;
+            background: var(--tg-theme-secondary-bg-color);
+            border-radius: var(--pill-radius);
+            font-size: 16px;
+            font-family: var(--font-system);
+            color: var(--tg-theme-text-color);
+            transition: var(--transition);
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .search-input:focus {
+            outline: none;
+            box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 2px rgba(64, 167, 227, 0.2);
+        }
+
+        /* Search engines dropdown */
+        .search-dropdown {
+            position: fixed;
+            bottom: 90px;
+            left: 16px;
+            right: 16px;
+            background: rgba(var(--tg-theme-section-bg-color-rgb, 255, 255, 255), 0.95);
+            backdrop-filter: var(--ios-blur);
+            -webkit-backdrop-filter: var(--ios-blur);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-medium);
+            z-index: 1500;
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: none;
+            transition: var(--transition);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .search-dropdown.active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: all;
+        }
+
+        .dropdown-header {
+            padding: 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .dropdown-title {
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--tg-theme-text-color);
+        }
+
+        .privacy-category {
+            padding: 8px 0;
+        }
+
+        .category-title {
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--tg-theme-subtitle-text-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .engine-list {
+            list-style: none;
+        }
+
+        .engine-item {
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+        }
+
+        .engine-item:last-child {
+            border-bottom: none;
+        }
+
+        .engine-item:hover, .engine-item:active {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .engine-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: var(--tg-theme-button-color);
+        }
+
+        .engine-info {
+            flex: 1;
+        }
+
+        .engine-name {
+            font-weight: 500;
+            font-size: 15px;
+            color: var(--tg-theme-text-color);
+            margin-bottom: 2px;
+        }
+
+        .engine-desc {
+            font-size: 13px;
+            color: var(--tg-theme-subtitle-text-color);
+        }
+
+        .privacy-badge {
+            padding: 4px 10px;
+            border-radius: var(--pill-radius);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-low {
+            background: rgba(255, 149, 0, 0.15);
+            color: #ff9500;
+        }
+
+        .badge-high {
+            background: rgba(52, 199, 89, 0.15);
+            color: #34c759;
+        }
+
+        /* Reset & Clean Screen */
+        .reset-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--tg-theme-bg-color);
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .reset-screen.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .reset-icon {
+            font-size: 64px;
+            color: var(--tg-theme-button-color);
+            margin-bottom: 24px;
+            animation: spin 1.5s linear infinite;
+        }
+
+        .reset-message {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--tg-theme-text-color);
+            margin-bottom: 8px;
+        }
+
+        .reset-submessage {
+            font-size: 16px;
+            color: var(--tg-theme-subtitle-text-color);
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.4;
+        }
+
+        /* Clean button in browser */
+        .clean-button {
+            background: var(--tg-theme-destructive-text-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: var(--pill-radius);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 2px 10px rgba(255, 59, 48, 0.2);
+        }
+
+        .clean-button:hover, .clean-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 1px 5px rgba(255, 59, 48, 0.3);
+        }
+
+        /* Animations */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        /* Theme injection for external sites */
+        .theme-injection {
+            display: none;
+        }
+
+        /* Dark mode adjustments */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.3);
+                --shadow-medium: 0 8px 30px rgba(0, 0, 0, 0.4);
+            }
+            
+            .engine-item:hover, .engine-item:active {
+                background: rgba(255, 255, 255, 0.05);
+            }
+            
+            .search-input {
+                box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+            }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 480px) {
+            .welcome-card {
+                padding: 24px 16px;
+                margin-bottom: 20px;
+            }
+            
+            .welcome-title {
+                font-size: 22px;
+            }
+            
+            .bottom-bar {
+                padding: 12px;
+                border-top-left-radius: 20px;
+                border-top-right-radius: 20px;
+            }
+            
+            .search-button {
+                width: 46px;
+                height: 46px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header with iOS pill tabs -->
+        <div class="header">
+            <div class="pill-tabs">
+                <div class="tab active" data-tab="home">
+                    <i class="fas fa-compass"></i> Browse
+                </div>
+                <div class="tab" data-tab="privacy">
+                    <i class="fas fa-user-shield"></i> Privacy
+                </div>
+                <div class="tab" data-tab="settings">
+                    <i class="fas fa-sliders-h"></i> Settings
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content" id="mainContent">
+            <div class="welcome-card fade-in">
+                <div class="welcome-icon">
+                    <i class="fas fa-globe-americas"></i>
+                </div>
+                <h1 class="welcome-title">Telegram Web Browser</h1>
+                <p class="welcome-subtitle">
+                    A privacy-focused browser built for Telegram Mini Apps. 
+                    Search anonymously with high-privacy engines or use your favorites.
+                </p>
+            </div>
+            
+            <!-- Privacy Tips Card -->
+            <div class="welcome-card fade-in" style="animation-delay: 0.1s; text-align: left;">
+                <h3 style="margin-bottom: 12px; color: var(--tg-theme-text-color);">
+                    <i class="fas fa-lightbulb" style="color: #ffcc00;"></i> Privacy Tips
+                </h3>
+                <ul style="padding-left: 20px; color: var(--tg-theme-subtitle-text-color); line-height: 1.6;">
+                    <li>All searches are incognito by default</li>
+                    <li>High-privacy engines don't track your searches</li>
+                    <li>History is automatically cleared when you close the browser</li>
+                    <li>Use "Reset & Clean" to instantly clear everything</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Browser View -->
+        <div class="browser-view" id="browserView">
+            <div class="browser-header">
+                <button class="back-button" id="backButton">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="browser-url" id="currentUrl">about:blank</div>
+                <button class="clean-button" id="cleanButton">
+                    <i class="fas fa-broom"></i> Reset & Clean
+                </button>
+            </div>
+            <div class="browser-container">
+                <iframe class="browser-iframe" id="browserFrame" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+            </div>
+        </div>
+
+        <!-- Bottom Search Bar -->
+        <div class="bottom-bar">
+            <div class="search-container">
+                <div class="search-input-container">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search or enter website address..." autocomplete="off">
+                </div>
+                <button class="search-button" id="searchToggle">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Engines Dropdown -->
+        <div class="search-dropdown" id="searchDropdown">
+            <div class="dropdown-header">
+                <div class="dropdown-title">Select Search Engine</div>
+            </div>
+            
+            <div class="privacy-category">
+                <div class="category-title">High Privacy</div>
+                <ul class="engine-list">
+                    <li class="engine-item" data-engine="duckduckgo" data-url="https://duckduckgo.com/?q=">
+                        <div class="engine-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div class="engine-info">
+                            <div class="engine-name">DuckDuckGo</div>
+                            <div class="engine-desc">Privacy-first search engine</div>
+                        </div>
+                        <div class="privacy-badge badge-high">High Privacy</div>
+                    </li>
+                    <li class="engine-item" data-engine="startpage" data-url="https://www.startpage.com/sp/search?query=">
+                        <div class="engine-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="engine-info">
+                            <div class="engine-name">StartPage</div>
+                            <div class="engine-desc">Google results, privately</div>
+                        </div>
+                        <div class="privacy-badge badge-high">High Privacy</div>
+                    </li>
+                    <li class="engine-item" data-engine="qwant" data-url="https://www.qwant.com/?q=">
+                        <div class="engine-icon">
+                            <i class="fas fa-leaf"></i>
+                        </div>
+                        <div class="engine-info">
+                            <div class="engine-name">Qwant</div>
+                            <div class="engine-desc">European privacy search</div>
+                        </div>
+                        <div class="privacy-badge badge-high">High Privacy</div>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="privacy-category">
+                <div class="category-title">Low Privacy</div>
+                <ul class="engine-list">
+                    <li class="engine-item" data-engine="google" data-url="https://www.google.com/search?q=">
+                        <div class="engine-icon">
+                            <i class="fab fa-google"></i>
+                        </div>
+                        <div class="engine-info">
+                            <div class="engine-name">Google</div>
+                            <div class="engine-desc">Most popular search engine</div>
+                        </div>
+                        <div class="privacy-badge badge-low">Low Privacy</div>
+                    </li>
+                    <li class="engine-item" data-engine="bing" data-url="https://www.bing.com/search?q=">
+                        <div class="engine-icon">
+                            <i class="fab fa-microsoft"></i>
+                        </div>
+                        <div class="engine-info">
+                            <div class="engine-name">Bing</div>
+                            <div class="engine-desc">Microsoft search engine</div>
+                        </div>
+                        <div class="privacy-badge badge-low">Low Privacy</div>
+                    </li>
+                    <li class="engine-item" data-engine="yahoo" data-url="https://search.yahoo.com/search?p=">
+                        <div class="engine-icon">
+                            <i class="fab fa-yahoo"></i>
+                        </div>
+                        <div class="engine-info">
+                            <div class="engine-name">Yahoo</div>
+                            <div class="engine-desc">Yahoo search</div>
+                        </div>
+                        <div class="privacy-badge badge-low">Low Privacy</div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Reset & Clean Screen -->
+        <div class="reset-screen" id="resetScreen">
+            <div class="reset-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <div class="reset-message">Everything has been cleaned</div>
+            <div class="reset-submessage">
+                All history, cookies, and search data have been removed. You're browsing privately.
+            </div>
+        </div>
+
+        <!-- Theme Injection for external sites (hidden) -->
+        <div class="theme-injection" id="themeInjection"></div>
+    </div>
+
+    <script>
+        // Telegram WebApp SDK Integration
+        const tg = window.Telegram.WebApp;
+        
+        // Initialize Telegram WebApp
+        tg.expand();
+        tg.enableClosingConfirmation();
+        tg.setHeaderColor('secondary_bg_color');
+        tg.setBackgroundColor('secondary_bg_color');
+        
+        // Apply Telegram theme colors
+        function applyTelegramTheme() {
+            document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff');
+            document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#000000');
+            document.documentElement.style.setProperty('--tg-theme-hint-color', tg.themeParams.hint_color || '#999999');
+            document.documentElement.style.setProperty('--tg-theme-link-color', tg.themeParams.link_color || '#2481cc');
+            document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#40a7e3');
+            document.documentElement.style.setProperty('--tg-theme-button-text-color', tg.themeParams.button_text_color || '#ffffff');
+            document.documentElement.style.setProperty('--tg-theme-secondary-bg-color', tg.themeParams.secondary_bg_color || '#f4f4f5');
+            
+            // Set iOS transparency based on theme
+            if (tg.themeParams.bg_color && tg.themeParams.bg_color !== '#ffffff') {
+                document.documentElement.style.setProperty('--ios-blur', 'saturate(180%) blur(25px)');
+            }
+        }
+        
+        // Apply theme on load and when theme changes
+        applyTelegramTheme();
+        tg.onEvent('themeChanged', applyTelegramTheme);
+        
+        // App State
+        let currentEngine = {
+            name: 'duckduckgo',
+            url: 'https://duckduckgo.com/?q=',
+            privacy: 'high'
+        };
+        
+        let searchHistory = [];
+        let isIncognito = true;
+        
+        // DOM Elements
+        const searchInput = document.getElementById('searchInput');
+        const searchToggle = document.getElementById('searchToggle');
+        const searchDropdown = document.getElementById('searchDropdown');
+        const browserView = document.getElementById('browserView');
+        const browserFrame = document.getElementById('browserFrame');
+        const backButton = document.getElementById('backButton');
+        const cleanButton = document.getElementById('cleanButton');
+        const resetScreen = document.getElementById('resetScreen');
+        const mainContent = document.getElementById('mainContent');
+        const currentUrl = document.getElementById('currentUrl');
+        const themeInjection = document.getElementById('themeInjection');
+        const tabs = document.querySelectorAll('.tab');
+        
+        // Search Engines
+        const searchEngines = {
+            duckduckgo: { name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=', privacy: 'high' },
+            startpage: { name: 'StartPage', url: 'https://www.startpage.com/sp/search?query=', privacy: 'high' },
+            qwant: { name: 'Qwant', url: 'https://www.qwant.com/?q=', privacy: 'high' },
+            google: { name: 'Google', url: 'https://www.google.com/search?q=', privacy: 'low' },
+            bing: { name: 'Bing', url: 'https://www.bing.com/search?q=', privacy: 'low' },
+            yahoo: { name: 'Yahoo', url: 'https://search.yahoo.com/search?p=', privacy: 'low' }
+        };
+        
+        // Initialize
+        function init() {
+            // Load saved engine preference
+            const savedEngine = localStorage.getItem('preferredEngine');
+            if (savedEngine && searchEngines[savedEngine]) {
+                currentEngine = searchEngines[savedEngine];
+            }
+            
+            // Event Listeners
+            searchToggle.addEventListener('click', toggleSearchDropdown);
+            searchInput.addEventListener('keypress', handleSearchInput);
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchDropdown.contains(e.target) && 
+                    e.target !== searchToggle && 
+                    !searchToggle.contains(e.target)) {
+                    searchDropdown.classList.remove('active');
+                }
+            });
+            
+            // Back button
+            backButton.addEventListener('click', closeBrowser);
+            
+            // Clean button
+            cleanButton.addEventListener('click', showResetScreen);
+            
+            // Tab switching
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabId = tab.getAttribute('data-tab');
+                    switchTab(tabId);
+                });
+            });
+            
+            // Search engine selection
+            document.querySelectorAll('.engine-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const engine = item.getAttribute('data-engine');
+                    selectSearchEngine(engine);
+                    searchDropdown.classList.remove('active');
+                    
+                    // Focus on search input
+                    setTimeout(() => {
+                        searchInput.focus();
+                    }, 300);
+                });
+            });
+            
+            // Reset screen click to close
+            resetScreen.addEventListener('click', () => {
+                resetScreen.classList.remove('active');
+            });
+            
+            // Send init data to Telegram
+            tg.ready();
+        }
+        
+        // Toggle search dropdown
+        function toggleSearchDropdown() {
+            searchDropdown.classList.toggle('active');
+            if (searchDropdown.classList.contains('active')) {
+                searchInput.focus();
+            }
+        }
+        
+        // Handle search input
+        function handleSearchInput(e) {
+            if (e.key === 'Enter') {
+                const query = searchInput.value.trim();
+                if (query) {
+                    performSearch(query);
+                }
+            }
+        }
+        
+        // Select search engine
+        function selectSearchEngine(engineId) {
+            if (searchEngines[engineId]) {
+                currentEngine = searchEngines[engineId];
+                localStorage.setItem('preferredEngine', engineId);
+                
+                // Update UI to show selected engine
+                document.querySelectorAll('.engine-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                document.querySelector(`[data-engine="${engineId}"]`).classList.add('selected');
+                
+                // Show notification
+                tg.showPopup({
+                    title: 'Search Engine Changed',
+                    message: `Now using ${currentEngine.name} (${currentEngine.privacy} privacy)`,
+                    buttons: [{ type: 'ok' }]
+                });
+            }
+        }
+        
+        // Perform search
+        function performSearch(query) {
+            if (!query) return;
+            
+            // Add to history
+            searchHistory.push({
+                query,
+                engine: currentEngine.name,
+                timestamp: new Date().toISOString(),
+                incognito: isIncognito
+            });
+            
+            // Construct search URL
+            let searchUrl;
+            if (query.includes('.') && !query.includes(' ') && 
+                (query.startsWith('http://') || query.startsWith('https://') || query.includes('.'))) {
+                // It's a URL
+                if (!query.startsWith('http')) {
+                    query = 'https://' + query;
+                }
+                searchUrl = query;
+                currentUrl.textContent = query;
+            } else {
+                // It's a search query
+                searchUrl = currentEngine.url + encodeURIComponent(query);
+                currentUrl.textContent = `${currentEngine.name} search: ${query}`;
+            }
+            
+            // Open in browser view
+            openBrowser(searchUrl);
+            
+            // Clear input
+            searchInput.value = '';
+            
+            // Close dropdown
+            searchDropdown.classList.remove('active');
+        }
+        
+        // Open browser view
+        function openBrowser(url) {
+            browserView.classList.add('active');
+            mainContent.classList.add('hidden');
+            
+            // Set iframe source with incognito headers
+            const incognitoUrl = url + (url.includes('?') ? '&' : '?') + 'incognito=' + Date.now();
+            browserFrame.src = incognitoUrl;
+            
+            // Apply theme injection to external sites
+            injectThemeToIframe();
+        }
+        
+        // Close browser view
+        function closeBrowser() {
+            browserView.classList.remove('active');
+            mainContent.classList.remove('hidden');
+            browserFrame.src = 'about:blank';
+            currentUrl.textContent = 'about:blank';
+        }
+        
+        // Show reset screen
+        function showResetScreen() {
+            resetScreen.classList.add('active');
+            
+            // Clear all data
+            searchHistory = [];
+            browserFrame.src = 'about:blank';
+            
+            // Send haptic feedback
+            tg.HapticFeedback.impactOccurred('medium');
+            
+            // Hide reset screen after 2 seconds
+            setTimeout(() => {
+                resetScreen.classList.remove('active');
+                closeBrowser();
+            }, 2000);
+        }
+        
+        // Switch tabs
+        function switchTab(tabId) {
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+            
+            // Show appropriate content based on tab
+            switch(tabId) {
+                case 'home':
+                    mainContent.style.display = 'block';
+                    break;
+                case 'privacy':
+                    // Show privacy tips
+                    tg.showAlert('Privacy features:\n\n• All searches are incognito\n• High-privacy engines available\n• Automatic history clearing\n• No tracking or cookies stored');
+                    break;
+                case 'settings':
+                    // Show settings options
+                    tg.showPopup({
+                        title: 'Settings',
+                        message: 'Browser Settings\n\n• Default search engine\n• Privacy level\n• Theme sync\n• Clear data on exit',
+                        buttons: [
+                            { id: 'engine', type: 'default', text: 'Change Engine' },
+                            { id: 'privacy', type: 'default', text: 'Privacy Settings' },
+                            { type: 'cancel' }
+                        ]
+                    }).then(btnId => {
+                        if (btnId === 'engine') {
+                            searchDropdown.classList.add('active');
+                        }
+                    });
+                    break;
+            }
+        }
+        
+        // Inject Telegram theme into iframe
+        function injectThemeToIframe() {
+            try {
+                const iframeDoc = browserFrame.contentDocument || browserFrame.contentWindow.document;
+                
+                // Create theme style
+                const themeStyle = document.createElement('style');
+                themeStyle.textContent = `
+                    body {
+                        background-color: ${tg.themeParams.bg_color || '#ffffff'} !important;
+                        color: ${tg.themeParams.text_color || '#000000'} !important;
+                    }
+                    
+                    /* Add smooth transitions */
+                    * {
+                        transition: background-color 0.3s ease, color 0.3s ease !important;
+                    }
+                    
+                    /* Theme-aware scrollbar */
+                    ::-webkit-scrollbar {
+                        width: 8px;
+                    }
+                    
+                    ::-webkit-scrollbar-track {
+                        background: ${tg.themeParams.secondary_bg_color || '#f4f4f5'};
+                    }
+                    
+                    ::-webkit-scrollbar-thumb {
+                        background: ${tg.themeParams.button_color || '#40a7e3'};
+                        border-radius: 4px;
+                    }
+                `;
+                
+                // Try to inject
+                if (iframeDoc.head) {
+                    iframeDoc.head.appendChild(themeStyle);
+                }
+            } catch (e) {
+                // Cross-origin restrictions may prevent injection
+                console.log('Theme injection not possible for this site due to security restrictions');
+            }
+        }
+        
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', init);
+        
+        // Add Telegram event handlers
+        tg.onEvent('viewportChanged', (event) => {
+            console.log('Viewport changed:', event);
+        });
+        
+        // Handle back button on Android
+        tg.BackButton.onClick(() => {
+            if (browserView.classList.contains('active')) {
+                closeBrowser();
+            }
+        });
+        
+        // Show back button when browser is open
+        function updateBackButton() {
+            if (browserView.classList.contains('active')) {
+                tg.BackButton.show();
+            } else {
+                tg.BackButton.hide();
+            }
+        }
+        
+        // Observe browser view changes
+        const observer = new MutationObserver(updateBackButton);
+        observer.observe(browserView, { attributes: true, attributeFilter: ['class'] });
+        
+        // Add some sample interactions for demonstration
+        setTimeout(() => {
+            // Add sample search suggestions
+            const suggestions = ['weather today', 'latest news', 'privacy tips', 'Telegram Mini Apps'];
+            const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
+            searchInput.placeholder = `Try "${randomSuggestion}" or enter address...`;
+        }, 1000);
+    </script>
+</body>
+  </html>
